@@ -1,0 +1,13 @@
+{
+  "name": "chromeos-web-desktop",
+  "version": "2.1.0",
+  "private": true,
+  "description": "ChromeOS-inspired web desktop organized into frontend/backend folders with Python and Node runners",
+  "scripts": {
+    "start": "node backend/server.js",
+    "start:py": "python run.py"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

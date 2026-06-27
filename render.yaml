@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: chromeos-web-desktop
+    runtime: python
+    plan: free
+    buildCommand: "echo 'No Python dependencies required'"
+    startCommand: python run.py
+    healthCheckPath: /healthz
+    autoDeploy: true

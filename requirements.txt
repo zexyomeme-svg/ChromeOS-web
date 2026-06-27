@@ -1,0 +1,3 @@
+# Runtime dependencies
+# None required.
+# This project runs on Python's standard library via run.py and backend/server.py.

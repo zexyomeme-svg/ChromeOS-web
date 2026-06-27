@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web ChromeOS</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+  <div id="system" class="system booting theme-light">
+    <div id="wallpaper-layer" class="wallpaper-layer"></div>
+    <div id="night-light-layer" class="night-light-layer"></div>
+    <div id="brightness-layer" class="brightness-layer"></div>
+
+    <div id="boot-screen" class="boot-screen overlay visible">
+      <div class="boot-card glass">
+        <div class="boot-logo">
+          <span class="boot-ring red"></span>
+          <span class="boot-ring yellow"></span>
+          <span class="boot-ring green"></span>
+          <span class="boot-ring blue"></span>
+        </div>
+        <h1>ChromeOS Web</h1>
+        <p>Starting up your desktop…</p>
+        <div class="progress-track"><div class="progress-bar"></div></div>
+      </div>
+    </div>
+
+    <div id="lock-screen" class="lock-screen overlay hidden">
+      <div class="lock-backdrop"></div>
+      <div class="lock-content">
+        <div class="lock-time" id="lock-time">12:00</div>
+        <div class="lock-date" id="lock-date">Monday, January 1</div>
+        <div id="lock-auth-panel" class="lock-auth-panel"></div>
+      </div>
+    </div>
+
+    <main id="desktop" class="desktop" aria-label="Desktop">
+      <div id="desk-strip" class="desk-strip glass"></div>
+      <div id="desktop-icons" class="desktop-icons"></div>
+      <aside id="widget-rail" class="widget-rail glass"></aside>
+      <div id="windows-layer" class="windows-layer"></div>
+    </main>
+
+    <section id="launcher" class="launcher glass panel hidden" aria-label="Launcher">
+      <div class="launcher-searchbar">
+        <span class="launcher-search-icon">⌕</span>
+        <input id="launcher-search" type="text" placeholder="Search apps, files, notes, messages, tasks, settings" autocomplete="off" />
+      </div>
+      <div class="launcher-section">
+        <div class="section-title">Apps</div>
+        <div id="launcher-app-grid" class="launcher-app-grid"></div>
+      </div>
+      <div class="launcher-section">
+        <div class="section-title">Results</div>
+        <div id="launcher-results" class="launcher-results"></div>
+      </div>
+    </section>
+
+    <section id="quick-settings" class="quick-settings glass panel hidden" aria-label="Quick settings"></section>
+    <section id="notifications-panel" class="notifications-panel glass panel hidden" aria-label="Notifications"></section>
+
+    <div id="context-menu" class="context-menu glass hidden"></div>
+    <div id="toast-container" class="toast-container"></div>
+    <div id="modal-layer" class="modal-layer hidden"></div>
+
+    <nav id="shelf" class="shelf glass" aria-label="Shelf">
+      <button id="launcher-button" class="shelf-pill shelf-control" title="Launcher" aria-label="Launcher">
+        <span class="launcher-dots">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </span>
+      </button>
+      <button id="desks-button" class="shelf-pill status-btn" title="Cycle desks" aria-label="Cycle desks">◫</button>
+      <div id="shelf-apps" class="shelf-apps"></div>
+      <div class="shelf-spacer"></div>
+      <button id="profile-button" class="shelf-pill profile-button" title="Profiles" aria-label="Profiles">
+        <span id="profile-avatar" class="profile-avatar">O</span>
+      </button>
+      <button id="notifications-button" class="shelf-pill status-btn" title="Notifications" aria-label="Notifications">
+        <span id="notification-dot" class="notification-dot hidden"></span>
+        🔔
+      </button>
+      <button id="system-status" class="shelf-pill system-status" title="Quick settings" aria-label="Quick settings">
+        <span id="status-wifi" class="status-symbol">◔</span>
+        <span id="status-battery" class="status-symbol">▰</span>
+        <span id="status-clock">12:00</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
