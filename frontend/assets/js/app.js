@@ -48,6 +48,7 @@ const dom = {
   desktopIcons: document.getElementById('desktop-icons'),
   widgetRail: document.getElementById('widget-rail'),
   windowsLayer: document.getElementById('windows-layer'),
+  overviewLayer: document.getElementById('overview-layer'),
   launcher: document.getElementById('launcher'),
   launcherButton: document.getElementById('launcher-button'),
   desksButton: document.getElementById('desks-button'),
@@ -109,6 +110,12 @@ let runtimeStats = {
   timestamp: null,
 };
 let runtimeStatsTimer = null;
+let networkState = {
+  online: navigator.onLine,
+  type: navigator.connection?.effectiveType || navigator.connection?.type || '',
+  saveData: !!navigator.connection?.saveData,
+};
+let overviewOpen = false;
 
 function uid(prefix = 'id') {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -224,6 +231,7 @@ function runtimeStatsSummary() {
     heapMb: processStats.heapUsedMb || null,
     environment: runtimeStats.environment || 'browser',
     uptimeSec: host.uptimeSec || 0,
+    connected: !!runtimeStats.connected,
   };
 }
 
@@ -256,6 +264,27 @@ function startRuntimeStatsPolling() {
     runtimeStatsTimer = setTimeout(pull, getRuntimePollingMs());
   }
   pull();
+}
+
+function updateNetworkState() {
+  networkState.online = navigator.onLine;
+  networkState.type = navigator.connection?.effectiveType || navigator.connection?.type || '';
+  networkState.saveData = !!navigator.connection?.saveData;
+  renderStatus();
+  if (!dom.quickSettings.classList.contains('hidden')) renderQuickSettings();
+}
+
+function getNetworkCaption() {
+  if (!networkState.online) return 'Offline';
+  const parts = ['Online'];
+  if (networkState.type) parts.push(networkState.type.toUpperCase());
+  if (networkState.saveData) parts.push('Data saver');
+  return parts.join(' • ');
+}
+
+function getBatteryCaption() {
+  const battery = Math.round(state.battery.level || 0);
+  return `${state.battery.charging ? 'Charging' : 'Battery'} • ${battery}%`;
 }
 
 function encodeSvgDataUri(svg) {
@@ -403,8 +432,8 @@ function createDefaultState(profileName = 'Owner') {
       batterySaver: false,
       twentyFourHour: false,
       locked: false,
-      widgets: true,
-      deskBar: true,
+      widgets: false,
+      deskBar: false,
       compactShelf: false,
     },
     pinnedApps: ['browser', 'files', 'mail', 'tasks', 'text', 'notes', 'clock', 'media', 'settings'],
@@ -792,6 +821,7 @@ function refreshWindowVisibility() {
   }
   renderShelf();
   renderDeskStrip();
+  if (overviewOpen) renderOverview();
 }
 
 function switchDesk(deskId) {
@@ -858,7 +888,7 @@ function removeCurrentDesk() {
 function renderDeskStrip() {
   if (!dom.deskStrip) return;
   dom.deskStrip.classList.toggle('hidden', !state.settings.deskBar);
-  dom.desksButton.title = `Current desk: ${currentDesk()?.name || 'Desk'}`;
+  dom.desksButton.title = `Overview and desks • ${currentDesk()?.name || 'Desk'}`;
   dom.deskStrip.innerHTML = `
     ${state.desks.map((desk, index) => `
       <button class="desk-chip ${desk.id === state.currentDeskId ? 'active' : ''}" data-desk-id="${desk.id}">
@@ -1135,6 +1165,10 @@ function closePanels({ except = null } = {}) {
   if (except !== 'launcher') dom.launcher.classList.add('hidden');
   if (except !== 'quick-settings') dom.quickSettings.classList.add('hidden');
   if (except !== 'notifications') dom.notificationsPanel.classList.add('hidden');
+  if (except !== 'overview') {
+    overviewOpen = false;
+    dom.overviewLayer.classList.add('hidden');
+  }
   dom.contextMenu.classList.add('hidden');
 }
 
@@ -1169,6 +1203,53 @@ function toggleNotifications(force) {
     dom.notificationsPanel.classList.remove('hidden');
   } else {
     dom.notificationsPanel.classList.add('hidden');
+  }
+}
+
+function renderOverview() {
+  const visible = windows.filter((win) => !win.minimized && win.deskId === state.currentDeskId);
+  dom.overviewLayer.innerHTML = `
+    <div class="overview-shell glass">
+      <div class="overview-topbar">
+        <div>
+          <strong>Overview</strong>
+          <div class="muted">${escapeHtml(currentDesk()?.name || 'Desk')} • ${visible.length} open window${visible.length === 1 ? '' : 's'}</div>
+        </div>
+        <div class="overview-desk-row">
+          ${state.desks.map((desk) => `
+            <button class="overview-desk-chip ${desk.id === state.currentDeskId ? 'active' : ''}" data-overview-desk="${desk.id}">${escapeHtml(desk.name)}</button>
+          `).join('')}
+          <button class="overview-desk-chip" data-overview-desk-action="add">＋ New desk</button>
+        </div>
+      </div>
+      <div class="overview-grid">
+        ${visible.length ? visible.map((win) => `
+          <button class="overview-window-card" data-overview-window="${win.id}">
+            <div class="overview-window-top">
+              <div class="overview-window-title">${renderIcon(win.appId, 'small')}<span>${escapeHtml(win.title)}</span></div>
+              <span class="overview-window-action" data-overview-close="${win.id}">✕</span>
+            </div>
+            <div class="overview-window-preview">
+              <div class="overview-preview-bar"></div>
+              <div class="overview-preview-body"></div>
+            </div>
+          </button>
+        `).join('') : '<div class="empty-state overview-empty">No open windows on this desk.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function toggleOverview(force) {
+  const shouldOpen = typeof force === 'boolean' ? force : dom.overviewLayer.classList.contains('hidden');
+  if (shouldOpen) {
+    closePanels({ except: 'overview' });
+    overviewOpen = true;
+    renderOverview();
+    dom.overviewLayer.classList.remove('hidden');
+  } else {
+    overviewOpen = false;
+    dom.overviewLayer.classList.add('hidden');
   }
 }
 
@@ -1234,25 +1315,17 @@ function renderStatus() {
   dom.statusClock.textContent = formatTime(new Date());
   dom.lockTime.textContent = formatTime(new Date());
   dom.lockDate.textContent = formatDateLong(new Date());
-  dom.statusWifi.textContent = state.settings.wifi ? '◔' : '◌';
+  dom.statusWifi.textContent = networkState.online && state.settings.wifi ? '📶' : '⦸';
   const battery = Math.round(state.battery.level || 0);
-  dom.statusBattery.textContent = state.battery.charging ? `⚡${battery}%` : `${battery}%`;
+  dom.statusBattery.textContent = state.battery.charging ? `⚡${battery}%` : `🔋${battery}%`;
   dom.notificationDot.classList.toggle('hidden', !state.notifications.length);
   dom.desksButton.textContent = `◫ ${state.desks.findIndex((desk) => desk.id === state.currentDeskId) + 1}`;
   renderProfileButton();
 }
 
 function renderDesktopIcons() {
-  const shortcuts = ['browser', 'files', 'mail', 'tasks', 'notes', 'calendar', 'paint', 'media', 'settings'];
-  dom.desktopIcons.innerHTML = shortcuts.map((appId) => {
-    const app = APPS[appId];
-    return `
-      <button class="desktop-shortcut" data-app="${appId}">
-        ${renderIcon(appId, 'large')}
-        <span>${escapeHtml(app.title)}</span>
-      </button>
-    `;
-  }).join('');
+  dom.desktopIcons.innerHTML = '';
+  dom.desktopIcons.setAttribute('aria-hidden', 'true');
 }
 
 function updateClockLoop() {
@@ -1415,6 +1488,7 @@ function createWindow(appId, options = {}) {
   if (options.title) setWindowTitle(win, options.title);
   syncWindowVisibility(win);
   renderShelf();
+  if (overviewOpen) renderOverview();
   addRecentApp(appId);
   return win;
 }
@@ -1573,6 +1647,8 @@ function executeLauncherResult(serialized) {
 function renderQuickSettings() {
   const todayEvents = state.events.filter((event) => event.date === todayIso()).slice(0, 3);
   const profile = getCurrentProfile();
+  const runtime = runtimeStatsSummary();
+  const mediaOpen = windows.some((win) => win.appId === 'media' && !win.minimized);
   dom.quickSettings.innerHTML = `
     <div class="qs-header">
       <div>
@@ -1581,18 +1657,27 @@ function renderQuickSettings() {
       </div>
       <button class="secondary-btn" data-action="open-settings">Settings</button>
     </div>
-    <div class="today-card">
-      <div class="setting-row"><strong>${escapeHtml(profile.name)}</strong><span>${escapeHtml(currentDesk()?.name || 'Desk')}</span></div>
-      <p class="muted">Active profile • ${state.settings.theme} theme • ${escapeHtml(getWallpaperObject().name)}</p>
+    <div class="qs-hero-card">
+      <div class="qs-hero-profile">
+        <span class="profile-chip-avatar" style="background:${profileGradient(profile)};">${escapeHtml(profile.avatar || profile.name.slice(0, 1))}</span>
+        <div>
+          <strong>${escapeHtml(profile.name)}</strong>
+          <div class="muted">${escapeHtml(currentDesk()?.name || 'Desk')} • ${escapeHtml(state.settings.theme)} theme</div>
+        </div>
+      </div>
+      <div class="qs-hero-meta">
+        <span>${escapeHtml(getWallpaperObject().name)}</span>
+        <span>${escapeHtml(getBatteryCaption())}</span>
+      </div>
     </div>
     <div class="tile-grid">
-      ${renderQuickToggle('wifi', 'Wi‑Fi', state.settings.wifi, state.settings.wifi ? 'Connected to ArenaNet' : 'Disconnected')}
-      ${renderQuickToggle('bluetooth', 'Bluetooth', state.settings.bluetooth, state.settings.bluetooth ? 'On' : 'Off')}
-      ${renderQuickToggle('nightLight', 'Night Light', state.settings.nightLight, state.settings.nightLight ? 'Warm display enabled' : 'Off')}
+      ${renderQuickToggle('wifi', 'Wi‑Fi', state.settings.wifi && networkState.online, state.settings.wifi ? getNetworkCaption() : 'Disabled in desktop')}
+      ${renderQuickToggle('bluetooth', 'Bluetooth', state.settings.bluetooth, state.settings.bluetooth ? 'Ready for accessories' : 'Off')}
+      ${renderQuickToggle('nightLight', 'Night Light', state.settings.nightLight, state.settings.nightLight ? 'Warmer evening tones' : 'Off')}
       ${renderQuickToggle('dnd', 'Do Not Disturb', state.settings.dnd, state.settings.dnd ? 'Notifications silenced' : 'Allow alerts')}
-      ${renderQuickToggle('batterySaver', 'Battery Saver', state.settings.batterySaver, state.settings.batterySaver ? 'Power optimized' : 'Standard mode')}
-      ${renderQuickToggle('widgets', 'Widgets', state.settings.widgets, state.settings.widgets ? 'Widget rail visible' : 'Hidden')}
-      <button class="tile-btn" data-action="cycle-desk"><strong>Desks</strong><span>Switch to next desk</span></button>
+      ${renderQuickToggle('batterySaver', 'Battery Saver', state.settings.batterySaver, state.settings.batterySaver ? 'Reduce visual intensity' : 'Standard mode')}
+      ${renderQuickToggle('widgets', 'Widgets', state.settings.widgets, state.settings.widgets ? 'Optional dashboard visible' : 'Hidden')}
+      <button class="tile-btn" data-action="toggle-overview"><strong>Overview</strong><span>See windows and desks</span></button>
       <button class="tile-btn" data-action="lock-screen"><strong>Lock</strong><span>Secure the desktop</span></button>
     </div>
     <div class="slider-card">
@@ -1604,12 +1689,13 @@ function renderQuickSettings() {
       <input type="range" min="0" max="100" value="${state.settings.volume}" data-slider="volume" />
     </div>
     <div class="today-card">
-      <div class="setting-row"><strong>System</strong><span>${state.battery.charging ? 'Charging' : 'Battery'} ${Math.round(state.battery.level)}%</span></div>
-      <p class="muted">Storage: ${getStorageUsage()} • ${state.notifications.length} notifications</p>
+      <div class="setting-row"><strong>System</strong><span>${runtime.connected ? 'Web service' : 'Browser mode'}</span></div>
+      <p class="muted">CPU ${runtime.cpu || '?'} • RAM ${runtime.ramMb ? formatFileSize(runtime.ramMb * 1024 * 1024) : 'unknown'} • RSS ${runtime.rssMb ? formatFileSize(runtime.rssMb * 1024 * 1024) : 'n/a'} • ${escapeHtml(runtime.profile)}</p>
     </div>
     <div class="today-card">
-      <div class="setting-row"><strong>Runtime</strong><span>${escapeHtml(runtimeStatsSummary().profile)}</span></div>
-      <p class="muted">${runtimeStats.connected ? 'Live server stats' : 'Browser fallback stats'} • CPU ${runtimeStatsSummary().cpu || '?'} • RAM ${runtimeStatsSummary().ramMb ? formatFileSize(runtimeStatsSummary().ramMb * 1024 * 1024) : 'unknown'} • RSS ${runtimeStatsSummary().rssMb ? formatFileSize(runtimeStatsSummary().rssMb * 1024 * 1024) : 'n/a'}</p>
+      <div class="setting-row"><strong>Media</strong><span>${mediaOpen ? 'Open' : 'Idle'}</span></div>
+      <p class="muted">Quick Settings on ChromeOS surfaces playback controls; use the Media app here for real local playback.</p>
+      <div class="settings-actions"><button class="small-chip" data-action="open-media">Open Media</button></div>
     </div>
     <div class="agenda-card">
       <div class="setting-row"><strong>Today</strong><button class="small-chip" data-action="open-calendar">Calendar</button></div>
@@ -4517,7 +4603,7 @@ function setupEvents() {
 
   dom.desksButton.addEventListener('click', (event) => {
     event.stopPropagation();
-    cycleDesk();
+    toggleOverview();
   });
 
   dom.profileButton.addEventListener('click', (event) => {
@@ -4587,6 +4673,37 @@ function setupEvents() {
     if (action === 'remove') removeCurrentDesk();
   });
 
+  dom.overviewLayer.addEventListener('click', async (event) => {
+    if (event.target === dom.overviewLayer) {
+      toggleOverview(false);
+      return;
+    }
+    const deskId = event.target.closest('[data-overview-desk]')?.dataset.overviewDesk;
+    if (deskId) {
+      switchDesk(deskId);
+      return;
+    }
+    const deskAction = event.target.closest('[data-overview-desk-action]')?.dataset.overviewDeskAction;
+    if (deskAction === 'add') {
+      await createDeskPrompt();
+      return;
+    }
+    const closeWindowId = event.target.closest('[data-overview-close]')?.dataset.overviewClose;
+    if (closeWindowId) {
+      const win = windows.find((item) => item.id === closeWindowId);
+      if (win) closeWindow(win);
+      return;
+    }
+    const overviewWindowId = event.target.closest('[data-overview-window]')?.dataset.overviewWindow;
+    if (overviewWindowId) {
+      const win = windows.find((item) => item.id === overviewWindowId);
+      if (win) {
+        focusWindow(win);
+        toggleOverview(false);
+      }
+    }
+  });
+
   dom.widgetRail.addEventListener('click', (event) => {
     const action = event.target.closest('[data-widget-action]')?.dataset.widgetAction;
     if (action === 'open-calendar') openApp('calendar');
@@ -4626,6 +4743,8 @@ function setupEvents() {
     if (action === 'open-settings') openApp('settings');
     if (action === 'lock-screen') lockSystem();
     if (action === 'open-calendar') openApp('calendar');
+    if (action === 'open-media') openApp('media');
+    if (action === 'toggle-overview') toggleOverview();
   });
 
   dom.quickSettings.addEventListener('input', (event) => {
@@ -4682,6 +4801,7 @@ function setupEvents() {
     if (event.key === 'Escape') {
       closePanels();
       if (!dom.modalLayer.classList.contains('hidden')) closeModal(null);
+      if (overviewOpen) toggleOverview(false);
     }
     if ((event.ctrlKey || event.metaKey) && event.code === 'Space') {
       event.preventDefault();
@@ -4701,7 +4821,7 @@ function setupEvents() {
   });
 
   document.addEventListener('pointerdown', (event) => {
-    const clickedPanel = event.target.closest('.panel, .shelf, .window, .modal-card, .context-menu, .widget-rail, .desk-strip, .lock-auth-panel');
+    const clickedPanel = event.target.closest('.panel, .shelf, .window, .modal-card, .context-menu, .widget-rail, .desk-strip, .lock-auth-panel, .overview-shell, .overview-layer');
     if (!clickedPanel) closePanels();
   });
 
@@ -4729,6 +4849,7 @@ function cycleWindows() {
 }
 
 function init() {
+  updateNetworkState();
   applySettings();
   renderNotificationsPanel();
   renderQuickSettings();
@@ -4739,6 +4860,9 @@ function init() {
   setupEvents();
   initializeBattery();
   startRuntimeStatsPolling();
+  window.addEventListener('online', updateNetworkState);
+  window.addEventListener('offline', updateNetworkState);
+  navigator.connection?.addEventListener?.('change', updateNetworkState);
   updateClockLoop();
   setInterval(updateClockLoop, 1000);
   startBootSequence();

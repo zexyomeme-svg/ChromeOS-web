@@ -42,10 +42,12 @@
       <div id="windows-layer" class="windows-layer"></div>
     </main>
 
+    <section id="overview-layer" class="overview-layer hidden" aria-label="Overview"></section>
+
     <section id="launcher" class="launcher glass panel hidden" aria-label="Launcher">
       <div class="launcher-searchbar">
         <span class="launcher-search-icon">⌕</span>
-        <input id="launcher-search" type="text" placeholder="Search apps, files, notes, messages, tasks, settings" autocomplete="off" />
+        <input id="launcher-search" type="text" placeholder="Search apps, files, settings, tasks, mail" autocomplete="off" />
       </div>
       <div class="launcher-section">
         <div class="section-title">Apps</div>
@@ -71,7 +73,7 @@
           <span></span><span></span><span></span>
         </span>
       </button>
-      <button id="desks-button" class="shelf-pill status-btn" title="Cycle desks" aria-label="Cycle desks">◫</button>
+      <button id="desks-button" class="shelf-pill status-btn" title="Overview and desks" aria-label="Overview and desks">◫</button>
       <div id="shelf-apps" class="shelf-apps"></div>
       <div class="shelf-spacer"></div>
       <button id="profile-button" class="shelf-pill profile-button" title="Profiles" aria-label="Profiles">
